@@ -1,8 +1,6 @@
-# Welcome to your CDK TypeScript project
+# AWS Infrastructure for Static Sites with CI/CD
 
-This is a blank project for CDK development with TypeScript.
-
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+This project provides a scalable and reusable AWS infrastructure for deploying static websites with an automated CI/CD pipeline. It streamlines the hosting, monitoring, and deployment of multiple static site projects using AWS services.
 
 ## Useful commands
 
@@ -12,3 +10,4 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 * `npx cdk deploy`  deploy this stack to your default AWS account/region
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
+
