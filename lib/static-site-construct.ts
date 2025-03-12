@@ -1,24 +1,15 @@
 import * as cdk from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
-// import * as eventsources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as cloudfront_origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53_targets from "aws-cdk-lib/aws-route53-targets";
-// import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as ssm from "aws-cdk-lib/aws-ssm";
-// import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
-
-export interface StaticSiteStackProps extends cdk.StackProps {
-  // readonly invalidateLambda: lambda.IFunction;
-}
 
 interface StaticSiteConstructProps {
   subDomain: string;
   secondLevelDomain: string;
-  // invalidateLambda: lambda.IFunction;
 }
 
 export class StaticSiteConstruct extends Construct {
@@ -35,6 +26,7 @@ export class StaticSiteConstruct extends Construct {
       { domainName: props.secondLevelDomain },
     );
 
+    // create ssl certificate to be used for cloudfront
     const certificate = new acm.Certificate(
       this,
       `${constructId}-Certificate`,
@@ -47,6 +39,7 @@ export class StaticSiteConstruct extends Construct {
       value: certificate.certificateArn,
     });
 
+    // create a bucket to store static files
     const bucket = new s3.Bucket(this, `${constructId}-Bucket`, {
       bucketName: domainName,
       websiteIndexDocument: "index.html",
@@ -55,6 +48,7 @@ export class StaticSiteConstruct extends Construct {
     });
     new cdk.CfnOutput(this, "Bucket", { value: bucket.bucketName });
 
+    // make a cloudfront cdn pointing to the bucket
     const distribution = new cloudfront.Distribution(
       this,
       `${constructId}-Distribution`,
@@ -78,6 +72,7 @@ export class StaticSiteConstruct extends Construct {
       value: distribution.distributionId,
     });
 
+    // apply custom domain name for the website
     const alias = new route53_targets.CloudFrontTarget(distribution);
     const arecord = new route53.ARecord(this, `${constructId}-ARecord`, {
       zone: hostedZone,
@@ -88,26 +83,5 @@ export class StaticSiteConstruct extends Construct {
     new cdk.CfnOutput(this, "Arecord", {
       value: arecord.domainName,
     });
-
-    // Cloudfront Invalidation
-    // new ssm.StringParameter(this, `${constructId}-StringParameter`, {
-    //   parameterName: `distributionId-${domainName}`,
-    //   stringValue: distribution.distributionId,
-    // });
-
-    // const s3Event = new eventsources.S3EventSource(bucket, {
-    //   events: [s3.EventType.OBJECT_CREATED, s3.EventType.OBJECT_REMOVED],
-    // });
-
-    // new sqs.Queue(this, `${constructId}-Queue`, {
-    //   queueName: `s3Event-${domainName}`,
-    // });
-
-    // bucket.addEventNotification()
-
-    // props.invalidateLambda.addEventSource(s3Event);
-    // new cdk.CfnOutput(this, "TriggerEvent", {
-    //   value: "Added Trigger event",
-    // });
   }
 }
