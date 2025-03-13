@@ -7,6 +7,7 @@ import { BorderRadiusStack } from "../lib/border-radius-stack";
 import { SudokuStack } from "../lib/sudoku-stack";
 import { OldEcommerceStack } from "../lib/old-ecommerce-stack";
 import { PortfolioTempStack } from "../lib/portfolio-temp-stack";
+import { PortfolioStack } from "../lib/portfolio-stack";
 
 const app = new cdk.App();
 
@@ -30,5 +31,7 @@ new SudokuStack(app, "SudokuStack", { env });
 new OldEcommerceStack(app, "OldEcommerceStack", { env });
 
 new PortfolioTempStack(app, "PortfolioTempStack", { env });
+
+new PortfolioStack(app, "PortfolioStack", { env });
 
 app.synth();
