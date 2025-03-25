@@ -8,6 +8,7 @@ import { SudokuStack } from "../lib/sudoku-stack";
 import { OldEcommerceStack } from "../lib/old-ecommerce-stack";
 import { PortfolioTempStack } from "../lib/portfolio-temp-stack";
 import { PortfolioStack } from "../lib/portfolio-stack";
+import { BlogsiteStack } from "../lib/blogsite-stack";
 
 const app = new cdk.App();
 
@@ -33,5 +34,7 @@ new OldEcommerceStack(app, "OldEcommerceStack", { env });
 new PortfolioTempStack(app, "PortfolioTempStack", { env });
 
 new PortfolioStack(app, "PortfolioStack", { env });
+
+new BlogsiteStack(app, "BlogsiteStack", { env });
 
 app.synth();

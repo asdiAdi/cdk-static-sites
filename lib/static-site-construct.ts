@@ -1,5 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import { RedirectProtocol } from "aws-cdk-lib/aws-s3";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as cloudfront_origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
@@ -8,16 +9,22 @@ import * as route53_targets from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
 
 interface StaticSiteConstructProps {
-  subDomain: string;
   secondLevelDomain: string;
+  subDomain?: string;
+  addlSubDomain?: string; // can be refactored to array in the future
 }
 
 export class StaticSiteConstruct extends Construct {
   constructor(scope: Construct, id: string, props: StaticSiteConstructProps) {
     super(scope, id);
 
-    const domainName = `${props.subDomain}.${props.secondLevelDomain}`;
-    const constructId = `${props.subDomain}-${props.secondLevelDomain}`;
+    const domainName = props.subDomain
+      ? `${props.subDomain}.${props.secondLevelDomain}`
+      : props.secondLevelDomain;
+    const constructId = props.subDomain
+      ? `${props.subDomain}-${props.secondLevelDomain}`
+      : props.secondLevelDomain;
+
     new cdk.CfnOutput(this, "DomainName", { value: "https://" + domainName });
 
     const hostedZone = route53.HostedZone.fromLookup(
@@ -83,5 +90,72 @@ export class StaticSiteConstruct extends Construct {
     new cdk.CfnOutput(this, "Arecord", {
       value: arecord.domainName,
     });
+
+    // point additional subdomain/s do domainName
+    if (props.addlSubDomain) {
+      const addlDomainName = `${props.addlSubDomain}.${props.secondLevelDomain}`;
+
+      const addlCertificate = new acm.Certificate(
+        this,
+        `${constructId}-AddlCertificate`,
+        {
+          domainName: addlDomainName,
+          validation: acm.CertificateValidation.fromDns(hostedZone),
+        },
+      );
+      new cdk.CfnOutput(this, "AddlCertificate", {
+        value: addlCertificate.certificateArn,
+      });
+
+      const addlBucket = new s3.Bucket(this, `${constructId}-AddlBucket`, {
+        bucketName: addlDomainName,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        autoDeleteObjects: true,
+        websiteRedirect: {
+          hostName: domainName,
+          protocol: RedirectProtocol.HTTPS,
+        },
+      });
+      new cdk.CfnOutput(this, "AddlBucket", { value: addlBucket.bucketName });
+
+      const addlDistribution = new cloudfront.Distribution(
+        this,
+        `${constructId}-AddlDistribution`,
+        {
+          defaultBehavior: {
+            origin: cloudfront_origins.S3BucketOrigin.withOriginAccessControl(
+              addlBucket,
+              {},
+            ),
+            compress: true,
+            allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+            viewerProtocolPolicy:
+              cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          },
+          // defaultRootObject: "index.html",
+          domainNames: [addlDomainName],
+          certificate: addlCertificate,
+        },
+      );
+      new cdk.CfnOutput(this, "AddlDistribution", {
+        value: addlDistribution.distributionId,
+      });
+
+      const addlAlias = new route53_targets.CloudFrontTarget(addlDistribution);
+      const addlArecord = new route53.ARecord(
+        this,
+        `${constructId}-AddlARecord`,
+        {
+          zone: hostedZone,
+          target: route53.RecordTarget.fromAlias(addlAlias),
+          recordName: props.addlSubDomain,
+          ttl: cdk.Duration.days(1),
+        },
+      );
+
+      new cdk.CfnOutput(this, "ArecordAddl", {
+        value: addlArecord.domainName,
+      });
+    }
   }
 }
