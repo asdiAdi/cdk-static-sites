@@ -10,9 +10,15 @@ import { Construct } from "constructs";
 interface StaticSiteConstructProps {
   subDomain: string;
   secondLevelDomain: string;
+  /** Enable SPA fallback: 403/404 -> 200 /index.html */
+  spa?: boolean;
 }
 
 export class StaticSiteConstruct extends Construct {
+  public readonly bucket: s3.Bucket;
+  public readonly distribution: cloudfront.Distribution;
+  public readonly certificate: acm.Certificate;
+
   constructor(scope: Construct, id: string, props: StaticSiteConstructProps) {
     super(scope, id);
 
@@ -26,8 +32,7 @@ export class StaticSiteConstruct extends Construct {
       { domainName: props.secondLevelDomain },
     );
 
-    // create ssl certificate to be used for cloudfront
-    const certificate = new acm.Certificate(
+    this.certificate = new acm.Certificate(
       this,
       `${constructId}-Certificate`,
       {
@@ -36,52 +41,87 @@ export class StaticSiteConstruct extends Construct {
       },
     );
     new cdk.CfnOutput(this, "Certificate", {
-      value: certificate.certificateArn,
+      value: this.certificate.certificateArn,
     });
 
-    // create a bucket to store static files
-    const bucket = new s3.Bucket(this, `${constructId}-Bucket`, {
+    this.bucket = new s3.Bucket(this, `${constructId}-Bucket`, {
       bucketName: domainName,
-      websiteIndexDocument: "index.html",
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
-    new cdk.CfnOutput(this, "Bucket", { value: bucket.bucketName });
+    new cdk.CfnOutput(this, "Bucket", { value: this.bucket.bucketName });
 
-    // make a cloudfront cdn pointing to the bucket
-    const distribution = new cloudfront.Distribution(
+    this.distribution = new cloudfront.Distribution(
       this,
       `${constructId}-Distribution`,
       {
+        comment: `CDN for ${domainName}`,
         defaultBehavior: {
           origin: cloudfront_origins.S3BucketOrigin.withOriginAccessControl(
-            bucket,
+            this.bucket,
             {},
           ),
           compress: true,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         },
         defaultRootObject: "index.html",
         domainNames: [domainName],
-        certificate: certificate,
+        certificate: this.certificate,
+        priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+        httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+        errorResponses: props.spa
+          ? [
+              {
+                httpStatus: 403,
+                responseHttpStatus: 200,
+                responsePagePath: "/index.html",
+                ttl: cdk.Duration.minutes(5),
+              },
+              {
+                httpStatus: 404,
+                responseHttpStatus: 200,
+                responsePagePath: "/index.html",
+                ttl: cdk.Duration.minutes(5),
+              },
+            ]
+          : undefined,
       },
     );
     new cdk.CfnOutput(this, "Distribution", {
-      value: distribution.distributionId,
+      value: this.distribution.distributionId,
+    });
+    new cdk.CfnOutput(this, "DistributionDomainName", {
+      value: this.distribution.distributionDomainName,
     });
 
-    // apply custom domain name for the website
-    const alias = new route53_targets.CloudFrontTarget(distribution);
-    const arecord = new route53.ARecord(this, `${constructId}-ARecord`, {
+    const alias = new route53_targets.CloudFrontTarget(this.distribution);
+    const aRecord = new route53.ARecord(this, `${constructId}-ARecord`, {
       zone: hostedZone,
       target: route53.RecordTarget.fromAlias(alias),
       recordName: props.subDomain,
-      ttl: cdk.Duration.days(1),
     });
     new cdk.CfnOutput(this, "Arecord", {
-      value: arecord.domainName,
+      value: aRecord.domainName,
+    });
+
+    const aaaaRecord = new route53.AaaaRecord(
+      this,
+      `${constructId}-AaaaRecord`,
+      {
+        zone: hostedZone,
+        target: route53.RecordTarget.fromAlias(alias),
+        recordName: props.subDomain,
+      },
+    );
+    new cdk.CfnOutput(this, "AaaaRecord", {
+      value: aaaaRecord.domainName,
     });
   }
 }
