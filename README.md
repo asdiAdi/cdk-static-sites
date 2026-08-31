@@ -11,3 +11,14 @@ This project provides a scalable and reusable AWS infrastructure for deploying s
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
 
+## Parallel deploys
+
+```bash
+# deploy all stacks, up to 3 in parallel
+npx cdk deploy --all --concurrency 3
+
+# max parallelism (fastest, but more likely to throttle)
+npx cdk deploy --all --concurrency <max_num>
+```
+
+`--concurrency` defaults to `1` (sequential) — you must set it explicitly.
