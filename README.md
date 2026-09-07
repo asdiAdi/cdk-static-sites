@@ -15,10 +15,10 @@ This project provides a scalable and reusable AWS infrastructure for deploying s
 
 ```bash
 # deploy all stacks, up to 3 in parallel
-npx cdk deploy --all --concurrency 3
+npx cdk deploy --all --concurrency 3 --require-approval never
 
 # max parallelism (fastest, but more likely to throttle)
-npx cdk deploy --all --concurrency <max_num>
+npx cdk deploy --all --concurrency `<max_num>` --require-approval never
 ```
 
 `--concurrency` defaults to `1` (sequential) — you must set it explicitly.
