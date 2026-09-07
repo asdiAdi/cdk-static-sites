@@ -8,6 +8,7 @@ import { OldEcommerceStack } from "../lib/old-ecommerce-stack";
 import { PortfolioTempStack } from "../lib/portfolio-temp-stack";
 import { PortfolioStack } from "../lib/portfolio-stack";
 import { TimerGridStack } from "../lib/timer-grid-stack";
+import { PwaTestStack } from "../lib/pwa-test-stack";
 
 const app = new cdk.App();
 
@@ -31,5 +32,7 @@ new PortfolioTempStack(app, "PortfolioTempStack", { env });
 new PortfolioStack(app, "PortfolioStack", { env });
 
 new TimerGridStack(app, "TimerGridStack", { env });
+
+new PwaTestStack(app, "PwaTestStack", { env });
 
 app.synth();
