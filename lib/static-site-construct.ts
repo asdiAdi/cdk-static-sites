@@ -6,6 +6,8 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53_targets from "aws-cdk-lib/aws-route53-targets";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as custom from "aws-cdk-lib/custom-resources";
 import { Construct } from "constructs";
 
 export const GITHUB_OWNER = "asdiAdi";
@@ -17,6 +19,9 @@ export const GITHUB_DEPLOY_MANAGED_POLICY_ARN =
   "arn:aws:iam::882357180990:policy/github-s3-cloudfront";
 export const GITHUB_OIDC_PROVIDER_ARN =
   "arn:aws:iam::882357180990:oidc-provider/token.actions.githubusercontent.com";
+export const SITE_SECRETS_TABLE_ARN =
+  "arn:aws:dynamodb:us-east-1:882357180990:table/gh_site_secrets";
+export const SITE_SECRETS_AWS_REGION = "us-east-1";
 
 export type GithubOwnerProps =
   | { githubOwner?: undefined; githubOwnerId?: undefined }
@@ -156,6 +161,59 @@ export class StaticSiteConstruct extends Construct {
       props.githubOwnerId ?? GITHUB_OWNER_ID,
       props.githubRepoId,
     );
+
+    if (this.deployRole) {
+      this.registerSiteSecrets(constructId, domainName, this.deployRole);
+    }
+  }
+
+  private registerSiteSecrets(
+    constructId: string,
+    domainName: string,
+    deployRole: iam.Role,
+  ): void {
+    const table = dynamodb.Table.fromTableArn(
+      this,
+      `${constructId}-SiteSecretsTable`,
+      SITE_SECRETS_TABLE_ARN,
+    );
+
+    const putItemParameters = {
+      TableName: table.tableName,
+      Item: {
+        pk: { S: domainName },
+        AWS_REGION: { S: SITE_SECRETS_AWS_REGION },
+        AWS_ROLE_TO_ASSUME: { S: deployRole.roleArn },
+        CLOUDFRONT_DISTRIBUTION_ID: { S: this.distribution.distributionId },
+        S3_BUCKET: { S: this.bucket.bucketName },
+      },
+    };
+
+    new custom.AwsCustomResource(this, `${constructId}-SiteSecrets`, {
+      onCreate: {
+        service: "DynamoDB",
+        action: "putItem",
+        parameters: putItemParameters,
+        physicalResourceId: custom.PhysicalResourceId.of(domainName),
+      },
+      onUpdate: {
+        service: "DynamoDB",
+        action: "putItem",
+        parameters: putItemParameters,
+        physicalResourceId: custom.PhysicalResourceId.of(domainName),
+      },
+      onDelete: {
+        service: "DynamoDB",
+        action: "deleteItem",
+        parameters: {
+          TableName: table.tableName,
+          Key: { pk: { S: domainName } },
+        },
+      },
+      policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: [table.tableArn],
+      }),
+    });
   }
 
   private createGithubDeployRole(
