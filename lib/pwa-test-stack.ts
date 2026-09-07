@@ -9,6 +9,8 @@ export class PwaTestStack extends cdk.Stack {
     new StaticSiteConstruct(this, "PwaTest", {
       secondLevelDomain: "carladi.com",
       subDomain: "pwa-test",
+      githubRepoName: "pwa-test",
+      githubRepoId: 1360042954
     });
   }
 }
