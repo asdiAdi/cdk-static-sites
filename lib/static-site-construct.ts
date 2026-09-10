@@ -34,8 +34,6 @@ export type GithubRepoProps =
 interface StaticSiteBaseProps {
   subDomain: string;
   secondLevelDomain: string;
-  /** Enable SPA fallback: 403/404 -> 200 /index.html */
-  spa?: boolean;
 }
 
 export type StaticSiteConstructProps = StaticSiteBaseProps &
@@ -61,14 +59,10 @@ export class StaticSiteConstruct extends Construct {
       { domainName: props.secondLevelDomain },
     );
 
-    this.certificate = new acm.Certificate(
-      this,
-      `${constructId}-Certificate`,
-      {
-        domainName: domainName,
-        validation: acm.CertificateValidation.fromDns(hostedZone),
-      },
-    );
+    this.certificate = new acm.Certificate(this, `${constructId}-Certificate`, {
+      domainName: domainName,
+      validation: acm.CertificateValidation.fromDns(hostedZone),
+    });
     new cdk.CfnOutput(this, "Certificate", {
       value: this.certificate.certificateArn,
     });
@@ -105,22 +99,6 @@ export class StaticSiteConstruct extends Construct {
         priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
         httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
         minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
-        errorResponses: props.spa
-          ? [
-            {
-              httpStatus: 403,
-              responseHttpStatus: 200,
-              responsePagePath: "/index.html",
-              ttl: cdk.Duration.minutes(5),
-            },
-            {
-              httpStatus: 404,
-              responseHttpStatus: 200,
-              responsePagePath: "/index.html",
-              ttl: cdk.Duration.minutes(5),
-            },
-          ]
-          : undefined,
       },
     );
     new cdk.CfnOutput(this, "Distribution", {
